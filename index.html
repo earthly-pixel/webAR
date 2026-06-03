@@ -18,6 +18,68 @@
         touch-action: none;
       }
 
+      .ar-overlay-button {
+        position: absolute;
+        left: 50%;
+        bottom: 32px;
+        transform: translateX(-50%);
+        z-index: 5;
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        border-radius: 999px;
+        padding: 12px 20px;
+        background: rgba(255, 215, 0, 0.4);
+        color: #111;
+        font-size: 14px;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        opacity: 1;
+        visibility: visible;
+        pointer-events: none;
+        transition: opacity 0.25s ease, visibility 0.25s ease;
+      }
+
+      .ar-overlay-button.is-hidden {
+        opacity: 0;
+        visibility: hidden;
+      }
+
+      .mindar-ui-overlay.mindar-ui-scanning {
+        z-index: 2147483646 !important;
+      }
+
+      .mindar-ui-scanning .scanning {
+        position: relative;
+        filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.4));
+      }
+
+      .mindar-ui-scanning .scanning .inner {
+        opacity: 1 !important;
+        border-radius: 0;
+        background: linear-gradient(to right, rgba(255, 215, 0, 0.4) 10px, transparent 10px)
+            0 0,
+          linear-gradient(to right, rgba(255, 215, 0, 0.4) 10px, transparent 10px)
+            0 100%,
+          linear-gradient(to left, rgba(255, 215, 0, 0.4) 10px, transparent 10px)
+            100% 0,
+          linear-gradient(to left, rgba(255, 215, 0, 0.4) 10px, transparent 10px)
+            100% 100%,
+          linear-gradient(to bottom, rgba(255, 215, 0, 0.4) 10px, transparent 10px)
+            0 0,
+          linear-gradient(to bottom, rgba(255, 215, 0, 0.4) 10px, transparent 10px)
+            100% 0,
+          linear-gradient(to top, rgba(255, 215, 0, 0.4) 10px, transparent 10px) 0
+            100%,
+          linear-gradient(to top, rgba(255, 215, 0, 0.4) 10px, transparent 10px)
+            100% 100% !important;
+      }
+
+      .mindar-ui-scanning .scanning .inner .scanline {
+        background: rgba(255, 215, 0, 0.4) !important;
+        box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
+      }
+
       @media (max-width: 768px) {
         a-scene {
           width: 100vw !important;
@@ -114,11 +176,78 @@
         },
       });
     </script>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const scene = document.querySelector("a-scene");
+        const targetEntity = document.querySelector('[mindar-image-target="targetIndex: 0"]');
+        if (!scene || !targetEntity) return;
+
+        let targetIsFound = false;
+        let overlayButton = null;
+
+        const ensureOverlayButton = () => {
+          const scanningOverlay = document.querySelector(".mindar-ui-scanning");
+          if (!scanningOverlay) return null;
+
+          if (!overlayButton) {
+            overlayButton = document.createElement("button");
+            overlayButton.id = "arOverlayButton";
+            overlayButton.className = "ar-overlay-button";
+            overlayButton.setAttribute("aria-hidden", "true");
+            overlayButton.textContent = "ARAHKAN KAMERA KE MARKER";
+          }
+
+          if (overlayButton.parentElement !== scanningOverlay) {
+            scanningOverlay.appendChild(overlayButton);
+          }
+
+          return overlayButton;
+        };
+
+        const showOverlay = () => {
+          if (targetIsFound) return;
+          const button = ensureOverlayButton();
+          if (!button) return;
+          button.classList.remove("is-hidden");
+        };
+
+        const hideOverlay = () => {
+          const button = ensureOverlayButton();
+          if (!button) return;
+          button.classList.add("is-hidden");
+        };
+
+        const observer = new MutationObserver(() => {
+          if (!targetIsFound) showOverlay();
+        });
+
+        observer.observe(document.body, {
+          childList: true,
+          subtree: true,
+        });
+
+        showOverlay();
+
+        scene.addEventListener("loaded", showOverlay);
+        scene.addEventListener("renderstart", showOverlay);
+        scene.addEventListener("arReady", showOverlay);
+
+        targetEntity.addEventListener("targetFound", () => {
+          targetIsFound = true;
+          hideOverlay();
+        });
+
+        targetEntity.addEventListener("targetLost", () => {
+          targetIsFound = false;
+          showOverlay();
+        });
+      });
+    </script>
   </head>
   <body>
     <a-scene
       mindar-image="
-      imageTargetSrc: ./targets.mind;
+      imageTargetSrc: ./targets_acekid.mind;
       autoStart: true;
       uiScanning: yes; 
       filterMinCF: 0.0001; 
