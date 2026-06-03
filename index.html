@@ -179,10 +179,12 @@
     <script>
       document.addEventListener("DOMContentLoaded", () => {
         const scene = document.querySelector("a-scene");
-        const targetEntity = document.querySelector('[mindar-image-target="targetIndex: 0"]');
-        if (!scene || !targetEntity) return;
+        const targetEntities = Array.from(
+          document.querySelectorAll("[mindar-image-target]")
+        );
+        if (!scene || targetEntities.length === 0) return;
 
-        let targetIsFound = false;
+        let activeTargetCount = 0;
         let overlayButton = null;
 
         const ensureOverlayButton = () => {
@@ -205,7 +207,7 @@
         };
 
         const showOverlay = () => {
-          if (targetIsFound) return;
+          if (activeTargetCount > 0) return;
           const button = ensureOverlayButton();
           if (!button) return;
           button.classList.remove("is-hidden");
@@ -218,7 +220,7 @@
         };
 
         const observer = new MutationObserver(() => {
-          if (!targetIsFound) showOverlay();
+          if (activeTargetCount === 0) showOverlay();
         });
 
         observer.observe(document.body, {
@@ -232,14 +234,19 @@
         scene.addEventListener("renderstart", showOverlay);
         scene.addEventListener("arReady", showOverlay);
 
-        targetEntity.addEventListener("targetFound", () => {
-          targetIsFound = true;
-          hideOverlay();
-        });
+        targetEntities.forEach((targetEntity) => {
+          targetEntity.addEventListener("targetFound", () => {
+            activeTargetCount += 1;
+            hideOverlay();
+          });
 
-        targetEntity.addEventListener("targetLost", () => {
-          targetIsFound = false;
-          showOverlay();
+          targetEntity.addEventListener("targetLost", () => {
+            activeTargetCount = Math.max(0, activeTargetCount - 1);
+
+            if (activeTargetCount === 0) {
+              showOverlay();
+            }
+          });
         });
       });
     </script>
@@ -247,7 +254,8 @@
   <body>
     <a-scene
       mindar-image="
-      imageTargetSrc: ./targets_acekid.mind;
+      imageTargetSrc: ./targets.mind;
+      maxTrack: 2;
       autoStart: true;
       uiScanning: yes; 
       filterMinCF: 0.0001; 
@@ -272,6 +280,18 @@
           gltf-model="#ususModel"
           position="0 0 0"
           scale="0.2 0.2 0.2"
+          touch-rotate="speed: 0.01"
+          gesture-handler
+        ></a-entity>
+      </a-entity>
+
+      <a-entity mindar-image-target="targetIndex: 1">
+        <a-entity
+          geometry="primitive: box; width: 0.6; height: 0.6; depth: 0.6"
+          material="color: #f4c542; metalness: 0.25; roughness: 0.35"
+          position="0 0 0"
+          rotation="0 45 0"
+          animation="property: rotation; to: 0 405 0; loop: true; dur: 6000; easing: linear"
           touch-rotate="speed: 0.01"
           gesture-handler
         ></a-entity>

@@ -1,0 +1,22 @@
+{
+  "name": "@zenith-xperience/mindar-offline-compiler",
+  "version": "0.0.2",
+  "main": "src/mindar-offline-compiler.js",
+  "types": "types/mindar-offline-compiler.d.ts",
+  "files": [
+    "src",
+    "types"
+  ],
+  "scripts": {
+    "build": "echo 'no build needed for plain JS'"
+  },
+  "keywords": [
+    "mindar",
+    "offline",
+    "compiler"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "canvas": "^3.2.0"
+  }
+}
