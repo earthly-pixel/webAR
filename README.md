@@ -1,21 +1,46 @@
 # webAR
 
-WebAR page using A-Frame + MindAR and browser camera. The scene is now wired for multiple image targets, with different 3D content for `targetIndex: 0` and `targetIndex: 1`.
+WebAR page using A-Frame + MindAR and browser camera. The scene is wired for multiple image targets, with different 3D content for `targetIndex: 0` and `targetIndex: 1`.
 
-Important: MindAR multi-target tracking requires one compiled `.mind` file that contains every marker image you want to scan. Two separate files like `targets_acekid.mind` and `targets_nonacekid.mind` cannot be scanned at the same time by one `a-scene`.
+Important: MindAR multi-target tracking requires one compiled `.mind` file that contains every marker image you want to scan.
 
-To make both targets work in this project:
+## PHP target upload backend
 
-1. Compile the original Acekid and Nonacekid marker images together into a single `.mind` file with the MindAR compiler: https://hiukim.github.io/mind-ar-js-doc/tools/compile/
-2. Replace the `imageTargetSrc` value in [index.html](/home/angga/www/app/laravel/webAR/index.html) with that combined file (already set to `./targets.mind` in this repo).
-3. Keep the existing `targetIndex: 0` and `targetIndex: 1` entities in [index.html](/home/angga/www/app/laravel/webAR/index.html) so each marker shows its own 3D object.
+This project now supports secure upload and replacement of the active MindAR target file.
+Public web files are served from `public/` (DDEV docroot), while secrets/config files remain outside web root.
+
+- Main page: `public/index.php`
+- Upload page: `public/upload-target.php`
+- Active target config endpoint: `public/target-config.php`
+- Shared backend config: `backend-config.php`
+
+Upload flow:
+
+1. Open `upload-target.php`
+2. Enter passphrase
+3. Upload a `.mind` file
+4. Backend stores file in `./uploads/` with a generated filename
+5. Backend updates `mindar-target.json`
+6. `index.php` reads config and sets `imageTargetSrc` automatically
+
+## Passphrase setup
+
+Set environment variable `MINDAR_UPLOAD_PASSPHRASE` before opening `upload-target.php`.
+
+Examples:
+
+```bash
+export MINDAR_UPLOAD_PASSPHRASE='your-strong-passphrase'
+```
+
+For DDEV, add it to your web container environment configuration, then restart.
 
 ## Run locally
 
-Because camera access requires a secure context, serve this project with a local web server (not `file://`). Example:
+Use PHP built-in server with `public/` as document root:
 
 ```bash
-python3 -m http.server 8080
+php -S localhost:8080 -t public
 ```
 
-Then open `http://localhost:8080/index.html`.
+Then open `http://localhost:8080/index.php`.

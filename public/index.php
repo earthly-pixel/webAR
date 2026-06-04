@@ -1,9 +1,17 @@
+<?php
+declare(strict_types=1);
+
+require dirname(__DIR__) . '/backend-config.php';
+
+$targetConfig = loadTargetConfig();
+$imageTargetSrc = htmlspecialchars((string)($targetConfig['imageTargetSrc'] ?? MINDAR_DEFAULT_TARGET), ENT_QUOTES, 'UTF-8');
+?>
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WebAR MindAR + A-Frame Demo</title>
+    <title>Acekid WebAR</title>
     <style>
       html,
       body {
@@ -49,6 +57,25 @@
         z-index: 2147483646 !important;
       }
 
+      .mindar-ui-overlay {
+        background: transparent !important;
+      }
+
+      .mindar-ui-overlay.mindar-ui-loading,
+      .mindar-ui-overlay.mindar-ui-compatibility,
+      .mindar-ui-overlay.mindar-ui-error {
+        background: transparent !important;
+      }
+
+      .ar-scene-pending {
+        opacity: 0;
+        transition: opacity 0.2s ease;
+      }
+
+      .ar-scene-ready {
+        opacity: 1;
+      }
+
       .mindar-ui-scanning .scanning {
         position: relative;
         filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.4));
@@ -80,6 +107,23 @@
         box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
       }
 
+      .admin-upload-link {
+        position: fixed;
+        top: 16px;
+        right: 16px;
+        z-index: 2147483647;
+        display: inline-block;
+        pointer-events: auto;
+        touch-action: manipulation;
+        color: #fff;
+        font: 600 13px/1.2 "Segoe UI", sans-serif;
+        text-decoration: none;
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        border-radius: 999px;
+        padding: 8px 12px;
+        background: rgba(0, 0, 0, 0.45);
+      }
+
       @media (max-width: 768px) {
         a-scene {
           width: 100vw !important;
@@ -98,8 +142,20 @@
     </style>
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/felixmariotto/aframe-gesture-detector@master/dist/aframe-gesture-detector.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/felixmariotto/aframe-gesture-detector@master/dist/aframe-gesture-handler.min.js"></script>
+    <script>
+      // Fallback components to avoid runtime errors if external gesture scripts are unavailable.
+      document.addEventListener("DOMContentLoaded", () => {
+        if (!window.AFRAME) return;
+
+        if (!AFRAME.components["gesture-detector"]) {
+          AFRAME.registerComponent("gesture-detector", {});
+        }
+
+        if (!AFRAME.components["gesture-handler"]) {
+          AFRAME.registerComponent("gesture-handler", {});
+        }
+      });
+    </script>
     <script>
       AFRAME.registerComponent("touch-rotate", {
         schema: {
@@ -184,8 +240,37 @@
         );
         if (!scene || targetEntities.length === 0) return;
 
+        const revealScene = () => {
+          scene.classList.remove("ar-scene-pending");
+          scene.classList.add("ar-scene-ready");
+        };
+
+        scene.addEventListener("arReady", revealScene, { once: true });
+        // Fallback if arReady is delayed on some devices.
+        setTimeout(revealScene, 2500);
+
         let activeTargetCount = 0;
+        let activeTargetIndex = null;
         let overlayButton = null;
+
+        const getTargetIndex = (targetEntity) => {
+          const targetData = targetEntity.getAttribute("mindar-image-target");
+          if (typeof targetData === "object" && targetData !== null) {
+            return Number(targetData.targetIndex);
+          }
+
+          const raw = String(targetData || "");
+          const match = raw.match(/targetIndex\s*:\s*(\d+)/i);
+          return match ? Number(match[1]) : -1;
+        };
+
+        const syncTargetVisibility = () => {
+          targetEntities.forEach((targetEntity) => {
+            const entityIndex = getTargetIndex(targetEntity);
+            targetEntity.object3D.visible =
+              activeTargetIndex !== null && entityIndex === activeTargetIndex;
+          });
+        };
 
         const ensureOverlayButton = () => {
           const scanningOverlay = document.querySelector(".mindar-ui-scanning");
@@ -229,6 +314,7 @@
         });
 
         showOverlay();
+        syncTargetVisibility();
 
         scene.addEventListener("loaded", showOverlay);
         scene.addEventListener("renderstart", showOverlay);
@@ -237,11 +323,20 @@
         targetEntities.forEach((targetEntity) => {
           targetEntity.addEventListener("targetFound", () => {
             activeTargetCount += 1;
+            activeTargetIndex = getTargetIndex(targetEntity);
+            syncTargetVisibility();
             hideOverlay();
+            console.log("MindAR targetFound index:", activeTargetIndex);
           });
 
           targetEntity.addEventListener("targetLost", () => {
             activeTargetCount = Math.max(0, activeTargetCount - 1);
+            const lostIndex = getTargetIndex(targetEntity);
+
+            if (lostIndex === activeTargetIndex) {
+              activeTargetIndex = null;
+              syncTargetVisibility();
+            }
 
             if (activeTargetCount === 0) {
               showOverlay();
@@ -252,16 +347,18 @@
     </script>
   </head>
   <body>
+    <a class="admin-upload-link" href="./upload-target.php">Upload Target</a>
     <a-scene
+      class="ar-scene-pending"
       mindar-image="
-      imageTargetSrc: ./targets.mind;
+      imageTargetSrc: <?php echo $imageTargetSrc; ?>;
       maxTrack: 2;
       autoStart: true;
       uiScanning: yes; 
       filterMinCF: 0.0001; 
       filterBeta: 0.001; 
-      warmupTolerance: 8; 
-      missTolerance: 8;"
+      warmupTolerance: 3; 
+      missTolerance: 3;"
       color-space="sRGB"
       renderer="colorManagement: true, physicallyCorrectLights"
       vr-mode-ui="enabled: false"
